@@ -23,7 +23,15 @@ jobs:
         run: python -m pip check
       - name: Run tests
         working-directory: charlotte_core_cloud_batch58
-        run: python -m pytest -q
+        run: python -m pytest -q --junitxml=pytest-results.xml
+      - name: Upload Python test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: charlotte-python-diagnostics
+          path: charlotte_core_cloud_batch58/pytest-results.xml
+          if-no-files-found: warn
+          retention-days: 14
   android:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -60,7 +68,7 @@ jobs:
         run: gradle --no-daemon --stacktrace :app:assembleDebug
       - name: Run Android unit tests
         working-directory: Charlotte_Android_Studio_Handoff
-        run: gradle --no-daemon :app:testDebugUnitTest
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Verify APK generated
         shell: bash
         run: |
@@ -74,3 +82,14 @@ jobs:
           name: charlotte-debug-apk
           path: Charlotte_Android_Studio_Handoff/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+      - name: Upload Android test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: charlotte-android-diagnostics
+          path: |
+            Charlotte_Android_Studio_Handoff/app/build/test-results/
+            Charlotte_Android_Studio_Handoff/app/build/reports/tests/
+            Charlotte_Android_Studio_Handoff/app/build/reports/problems/
+          if-no-files-found: warn
+          retention-days: 14
