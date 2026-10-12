@@ -1,7 +1,25 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 
-android { namespace = "com.charlotte.voice"; compileSdk = 35
-    defaultConfig { applicationId = "com.charlotte.voice"; minSdk = 26; targetSdk = 35; versionCode = 2; versionName = "0.2.0" }
+android {
+    namespace = "com.charlotte.voice"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.charlotte.voice"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
