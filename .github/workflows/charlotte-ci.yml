@@ -50,15 +50,7 @@ jobs:
         run: test -f Charlotte_Android_Studio_Handoff/app/build.gradle.kts
       - name: Verify AndroidX configuration
         working-directory: Charlotte_Android_Studio_Handoff
-        run: grep -Eq '^android\.useAndroidX=true        working-directory: Charlotte_Android_Studio_Handoff
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: charlotte-debug-apk
-          path: Charlotte_Android_Studio_Handoff/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
- gradle.properties
+        run: grep -Fxq 'android.useAndroidX=true' gradle.properties
       - name: Build debug APK
         working-directory: Charlotte_Android_Studio_Handoff
         run: gradle --no-daemon --stacktrace :app:assembleDebug
