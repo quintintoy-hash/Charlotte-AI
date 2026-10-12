@@ -28,6 +28,16 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest -q --junitxml=pytest-results.xml 2>&1 | tee pytest-console.log
+      - name: Summarize Python results
+        if: always()
+        shell: bash
+        run: |
+          echo '## Charlotte Python checks' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f charlotte_core_cloud_batch58/pytest-results.xml ]; then
+            echo 'Pytest XML report generated; consult job conclusion and attached diagnostics for pass/fail.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Pytest XML report missing: test execution may not have started.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload Python test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -92,6 +102,19 @@ jobs:
           name: charlotte-debug-apk
           path: Charlotte_Android_Studio_Handoff/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+      - name: Summarize Android results
+        if: always()
+        shell: bash
+        run: |
+          echo '## Charlotte Android checks' >> "$GITHUB_STEP_SUMMARY"
+          APK='Charlotte_Android_Studio_Handoff/app/build/outputs/apk/debug/app-debug.apk'
+          if [ -s "$APK" ]; then
+            echo 'Debug APK file exists (not a release certification).' >> "$GITHUB_STEP_SUMMARY"
+            sha256sum "$APK" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No nonempty debug APK found.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo 'Consult job conclusion and diagnostic artifacts for test results.' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload Android test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
