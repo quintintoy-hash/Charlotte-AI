@@ -17,7 +17,10 @@ jobs:
       - name: Verify source present
         run: test -f charlotte_core_cloud_batch58/pyproject.toml
       - name: Install test dependencies
-        run: python -m pip install pytest
+        working-directory: charlotte_core_cloud_batch58
+        run: python -m pip install -e . pytest
+      - name: Verify Python dependency compatibility
+        run: python -m pip check
       - name: Run tests
         working-directory: charlotte_core_cloud_batch58
         run: python -m pytest -q
