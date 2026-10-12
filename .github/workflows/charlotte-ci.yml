@@ -23,13 +23,17 @@ jobs:
         run: python -m pip check
       - name: Run tests
         working-directory: charlotte_core_cloud_batch58
-        run: python -m pytest -q --junitxml=pytest-results.xml
+        run: |
+          set -o pipefail
+          python -m pytest -q --junitxml=pytest-results.xml 2>&1 | tee pytest-console.log
       - name: Upload Python test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: charlotte-python-diagnostics
-          path: charlotte_core_cloud_batch58/pytest-results.xml
+          path: |
+            charlotte_core_cloud_batch58/pytest-results.xml
+            charlotte_core_cloud_batch58/pytest-console.log
           if-no-files-found: warn
           retention-days: 14
   android:
@@ -65,10 +69,14 @@ jobs:
         run: grep -Fxq 'android.useAndroidX=true' gradle.properties
       - name: Build debug APK
         working-directory: Charlotte_Android_Studio_Handoff
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee android-build.log
       - name: Run Android unit tests
         working-directory: Charlotte_Android_Studio_Handoff
-        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace :app:testDebugUnitTest 2>&1 | tee android-tests.log
       - name: Verify APK generated
         shell: bash
         run: |
@@ -88,6 +96,8 @@ jobs:
         with:
           name: charlotte-android-diagnostics
           path: |
+            Charlotte_Android_Studio_Handoff/android-build.log
+            Charlotte_Android_Studio_Handoff/android-tests.log
             Charlotte_Android_Studio_Handoff/app/build/test-results/
             Charlotte_Android_Studio_Handoff/app/build/reports/tests/
             Charlotte_Android_Studio_Handoff/app/build/reports/problems/
