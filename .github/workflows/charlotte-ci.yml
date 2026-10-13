@@ -79,6 +79,19 @@ jobs:
       - name: Verify AndroidX configuration
         working-directory: Charlotte_Android_Studio_Handoff
         run: grep -Fxq 'android.useAndroidX=true' gradle.properties
+      - name: Verify speech recognition service visibility
+        working-directory: Charlotte_Android_Studio_Handoff
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          manifest = ET.parse("app/src/main/AndroidManifest.xml").getroot()
+          android = "{http://schemas.android.com/apk/res/android}"
+          actions = manifest.findall("./queries/intent/action")
+          assert any(action.get(android + "name") == "android.speech.RecognitionService" for action in actions), (
+              "Android 11+ speech recognition service visibility declaration is missing"
+          )
+          print("Speech recognition service visibility verified")
+          PY
       - name: Build debug APK
         working-directory: Charlotte_Android_Studio_Handoff
         run: |
