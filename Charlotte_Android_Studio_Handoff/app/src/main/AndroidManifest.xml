@@ -3,6 +3,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@style/AppTheme" android:label="Charlotte">
         <activity android:name=".MainActivity" android:exported="true" android:label="Charlotte">
             <intent-filter>
