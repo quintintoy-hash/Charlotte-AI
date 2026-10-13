@@ -87,8 +87,14 @@ class MainActivity : Activity() {
                         val phrases = results?.getStringArrayList(
                             SpeechRecognizer.RESULTS_RECOGNITION
                         )
-                        transcript.text = phrases?.firstOrNull() ?: "No words recognised."
-                        finishListening("Microphone inactive.")
+                        val spoken = phrases?.firstOrNull() ?: ""
+                        transcript.text = spoken.ifBlank { "No words recognised." }
+                        val wakeDetected = WakeWordMatcher.containsWakeWord(spoken)
+                        finishListening(if (wakeDetected) {
+                            "Charlotte detected. Microphone inactive."
+                        } else {
+                            "Microphone inactive. Say Charlotte to activate."
+                        })
                     }
                     override fun onPartialResults(partialResults: Bundle?) {}
                     override fun onEvent(eventType: Int, params: Bundle?) {}
