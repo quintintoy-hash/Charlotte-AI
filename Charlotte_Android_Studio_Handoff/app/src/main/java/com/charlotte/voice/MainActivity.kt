@@ -54,7 +54,10 @@ class MainActivity : Activity() {
         layout.addView(listenButton)
         layout.addView(Button(this).apply {
             text = "Start voice session"
-            setOnClickListener { requestVoiceSession() }
+            setOnClickListener {
+                if (listening) stopListening()
+                requestVoiceSession()
+            }
         })
         layout.addView(Button(this).apply {
             text = "Stop voice session"
@@ -81,6 +84,7 @@ class MainActivity : Activity() {
 
     private fun startVoiceSession() {
         pendingVoiceSession = false
+        if (listening) stopListening()
         try {
             val intent = Intent(this, CharlotteVoiceForegroundService::class.java).apply {
                 action = CharlotteVoiceForegroundService.ACTION_START
@@ -93,6 +97,7 @@ class MainActivity : Activity() {
     }
 
     private fun requestToListen() {
+        stopService(Intent(this, CharlotteVoiceForegroundService::class.java))
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             status.text = "Speech recognition is unavailable on this device."
             return
