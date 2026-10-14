@@ -89,7 +89,6 @@ class CharlotteVoiceForegroundService : Service() {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     if (!active || generation != sessionGeneration) return
-                    attempts = 0
                     showNotification("Microphone active. Say Charlotte. Tap Stop to end.")
                 }
                 override fun onBeginningOfSpeech() {}
@@ -112,6 +111,7 @@ class CharlotteVoiceForegroundService : Service() {
                     if (!active || generation != sessionGeneration) return
                     val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull().orEmpty()
+                    if (spoken.isNotBlank()) attempts = 0
                     if (WakeWordMatcher.containsWakeWord(spoken)) {
                         showNotification("Charlotte detected. Listening session active.")
                     }
