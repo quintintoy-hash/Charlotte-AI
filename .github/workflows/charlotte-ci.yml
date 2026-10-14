@@ -106,6 +106,7 @@ jobs:
           set -o pipefail
           gradle --no-daemon --stacktrace :app:testDebugUnitTest 2>&1 | tee android-tests.log
       - name: Verify APK generated
+        if: success() || failure()
         shell: bash
         run: |
           set -euo pipefail
@@ -113,6 +114,7 @@ jobs:
           test -s "$APK"
           ls -lh "$APK"
       - name: Upload debug APK
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: charlotte-debug-apk
