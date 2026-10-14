@@ -1,39 +1,155 @@
 package com.charlotte.voice
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 
 /**
- * Visible foreground-session scaffold. Does not record audio or claim wake-word detection.
- * Audio capture must be implemented separately with permission and lifecycle controls.
+ * Explicitly started, visible speech-recognition session.
+ * The system speech provider may transmit audio to a network service.
+ * This is best-effort recognition, not guaranteed always-on wake-word detection.
  */
 class CharlotteVoiceForegroundService : Service() {
+    private val handler = Handler(Looper.getMainLooper())
+    private var recognizer: SpeechRecognizer? = null
+    private var active = false
+    private var attempts = 0
+    private val retry = Runnable { listen() }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action != ACTION_START) {
-            stopSelf(startId)
+        if (intent?.action == ACTION_STOP) {
+            stopSelf()
             return START_NOT_STICKY
         }
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
+        if (intent?.action != ACTION_START ||
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
+            !SpeechRecognizer.isRecognitionAvailable(this)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (active) return START_NOT_STICKY
+        active = true
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "Charlotte voice session", NotificationManager.IMPORTANCE_LOW)
+        )
+        showNotification("Listening session starting. Speech provider may use the internet.")
+        listen()
+        return START_NOT_STICKY
+    }
+
+    private fun showNotification(message: String) {
+        val stopIntent = Intent(this, CharlotteVoiceForegroundService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stop = PendingIntent.getService(
+            this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Charlotte voice session")
-            .setContentText("Session scaffold active; microphone recording is not enabled.")
+            .setContentText(message)
+            .setOngoing(true)
+            .addAction(Notification.Action.Builder(
+                android.R.drawable.ic_media_pause, "Stop microphone", stop
+            ).build())
             .build()
         startForeground(101, notification)
-        return START_NOT_STICKY
+    }
+
+    private fun listen() {
+        if (!active) return
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            stopSelf()
+            return
+        }
+        recognizer?.destroy()
+        recognizer = null
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            stopSelf()
+            return
+        }
+        recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    attempts = 0
+                    showNotification("Microphone active. Say Charlotte. Tap Stop to end.")
+                }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {
+                    showNotification("Processing speech. Tap Stop to end.")
+                }
+                override fun onError(error: Int) {
+                    if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
+                        error == SpeechRecognizer.ERROR_CLIENT) {
+                        stopSelf()
+                    } else {
+                        scheduleNext()
+                    }
+                }
+                override fun onResults(results: Bundle?) {
+                    val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull().orEmpty()
+                    if (WakeWordMatcher.containsWakeWord(spoken)) {
+                        showNotification("Charlotte detected. Listening session active.")
+                    }
+                    scheduleNext()
+                }
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-GB")
+        }
+        try {
+            recognizer?.startListening(intent)
+        } catch (e: Exception) {
+            stopSelf()
+        }
+    }
+
+    private fun scheduleNext() {
+        if (!active) return
+        recognizer?.destroy()
+        recognizer = null
+        attempts++
+        if (attempts > 8) {
+            stopSelf()
+            return
+        }
+        handler.removeCallbacks(retry)
+        handler.postDelayed(retry, (500L * attempts).coerceAtMost(4000L))
+    }
+
+    override fun onDestroy() {
+        active = false
+        handler.removeCallbacks(retry)
+        recognizer?.cancel()
+        recognizer?.destroy()
+        recognizer = null
+        super.onDestroy()
     }
 
     companion object {
         const val ACTION_START = "com.charlotte.voice.START_SESSION"
+        const val ACTION_STOP = "com.charlotte.voice.STOP_SESSION"
         private const val CHANNEL = "charlotte_voice_session"
     }
 }
