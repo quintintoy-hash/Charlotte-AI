@@ -9,6 +9,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.widget.Button
+import android.os.Build
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -22,6 +23,7 @@ class MainActivity : Activity() {
     private lateinit var listenButton: Button
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
+    private var pendingVoiceSession = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +52,44 @@ class MainActivity : Activity() {
         layout.addView(status)
         layout.addView(transcript)
         layout.addView(listenButton)
+        layout.addView(Button(this).apply {
+            text = "Start voice session"
+            setOnClickListener { requestVoiceSession() }
+        })
+        layout.addView(Button(this).apply {
+            text = "Stop voice session"
+            setOnClickListener {
+                stopService(Intent(this@MainActivity, CharlotteVoiceForegroundService::class.java))
+                status.text = "Voice session stop requested."
+            }
+        })
         setContentView(layout)
+    }
+
+    private fun requestVoiceSession() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            status.text = "Speech recognition unavailable."
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingVoiceSession = true
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_MICROPHONE)
+            return
+        }
+        startVoiceSession()
+    }
+
+    private fun startVoiceSession() {
+        pendingVoiceSession = false
+        try {
+            val intent = Intent(this, CharlotteVoiceForegroundService::class.java).apply {
+                action = CharlotteVoiceForegroundService.ACTION_START
+            }
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+            status.text = "Voice session requested. Use notification Stop to end."
+        } catch (e: Exception) {
+            status.text = "Voice session could not start. Check microphone permissions."
+        }
     }
 
     private fun requestToListen() {
@@ -136,8 +175,9 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_MICROPHONE) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-                startListening()
+                if (pendingVoiceSession) startVoiceSession() else startListening()
             } else {
+                pendingVoiceSession = false
                 status.text = "Microphone permission denied. Microphone inactive."
             }
         }
