@@ -1,10 +1,10 @@
 package com.charlotte.voice
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
-import kotlin.test.assertFailsWith
+import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+
 
 class CharlotteRecoveryEngineTest {
     @Test fun unknownOrStaleStateCannotTriggerRepair() {
@@ -22,7 +22,12 @@ class CharlotteRecoveryEngineTest {
         assertFalse(decision.requiresApproval)
         engine.recordAttempt(CharlotteComponent.SPEECH, decision)
         assertEquals(RepairAction.ESCALATE, engine.decide(CharlotteComponent.SPEECH, 12L).action)
-        assertFailsWith<IllegalArgumentException> { engine.recordAttempt(CharlotteComponent.SPEECH, decision) }
+        try {
+            engine.recordAttempt(CharlotteComponent.SPEECH, decision)
+            throw AssertionError("Expected repeated repair attempt to be rejected")
+        } catch (expected: IllegalArgumentException) {
+            // Correctly blocked.
+        }
     }
 
     @Test fun configurationRestoreRequiresApproval() {
