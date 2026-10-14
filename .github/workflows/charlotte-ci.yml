@@ -144,3 +144,47 @@ jobs:
             Charlotte_Android_Studio_Handoff/app/build/reports/problems/
           if-no-files-found: warn
           retention-days: 14
+
+  report-ci:
+    name: Publish CI status to GitHub Issues
+    if: always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [python, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Report failing or recovered CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PYTHON_RESULT: ${{ needs.python.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='Charlotte CI: build or test failure'
+          existing="$(gh issue list --repo "$GH_REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)"
+          if [[ "$PYTHON_RESULT" == 'success' && "$ANDROID_RESULT" == 'success' ]]; then
+            if [[ -n "$existing" ]]; then
+              gh issue comment "$existing" --repo "$GH_REPO" --body "CI recovered on commit $COMMIT_SHA. Python: $PYTHON_RESULT; Android: $ANDROID_RESULT. Run: $RUN_URL"
+              gh issue close "$existing" --repo "$GH_REPO" --reason completed
+            fi
+            exit 0
+          fi
+          body="CI failed or did not complete on commit $COMMIT_SHA.
+
+          Python job: $PYTHON_RESULT
+          Android job: $ANDROID_RESULT
+
+          Inspect the job steps, logs, and diagnostic artifacts: $RUN_URL
+
+          This issue contains status metadata only, not raw logs or secrets."
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --repo "$GH_REPO" --body "$body"
+          else
+            gh issue create --repo "$GH_REPO" --title "$title" --body "$body"
+          fi
