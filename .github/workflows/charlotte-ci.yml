@@ -170,6 +170,11 @@ jobs:
           set -euo pipefail
           title='Charlotte CI: build or test failure'
           existing="$(gh issue list --repo "$GH_REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)"
+          # Superseded runs are cancelled by concurrency; they are not test failures.
+          if [[ "$PYTHON_RESULT" == 'cancelled' && "$ANDROID_RESULT" == 'cancelled' ]]; then
+            echo 'Both jobs cancelled; skipping failure issue.'
+            exit 0
+          fi
           if [[ "$PYTHON_RESULT" == 'success' && "$ANDROID_RESULT" == 'success' ]]; then
             if [[ -n "$existing" ]]; then
               gh issue comment "$existing" --repo "$GH_REPO" --body "CI recovered on commit $COMMIT_SHA. Python: $PYTHON_RESULT; Android: $ANDROID_RESULT. Run: $RUN_URL"
