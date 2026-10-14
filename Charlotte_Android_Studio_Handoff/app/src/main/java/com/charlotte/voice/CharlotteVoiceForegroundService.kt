@@ -26,6 +26,7 @@ class CharlotteVoiceForegroundService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var active = false
     private var attempts = 0
+    private var sessionGeneration = 0
     private val retry = Runnable { listen() }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -43,6 +44,7 @@ class CharlotteVoiceForegroundService : Service() {
         }
         if (active) return START_NOT_STICKY
         active = true
+        sessionGeneration++
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "Charlotte voice session", NotificationManager.IMPORTANCE_LOW)
         )
@@ -82,9 +84,11 @@ class CharlotteVoiceForegroundService : Service() {
             stopSelf()
             return
         }
+        val generation = sessionGeneration
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
+                    if (!active || generation != sessionGeneration) return
                     attempts = 0
                     showNotification("Microphone active. Say Charlotte. Tap Stop to end.")
                 }
@@ -92,9 +96,11 @@ class CharlotteVoiceForegroundService : Service() {
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {
+                    if (!active || generation != sessionGeneration) return
                     showNotification("Processing speech. Tap Stop to end.")
                 }
                 override fun onError(error: Int) {
+                    if (!active || generation != sessionGeneration) return
                     if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ||
                         error == SpeechRecognizer.ERROR_CLIENT) {
                         stopSelf()
@@ -103,6 +109,7 @@ class CharlotteVoiceForegroundService : Service() {
                     }
                 }
                 override fun onResults(results: Bundle?) {
+                    if (!active || generation != sessionGeneration) return
                     val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         ?.firstOrNull().orEmpty()
                     if (WakeWordMatcher.containsWakeWord(spoken)) {
@@ -129,6 +136,7 @@ class CharlotteVoiceForegroundService : Service() {
         if (!active) return
         recognizer?.destroy()
         recognizer = null
+        sessionGeneration++
         attempts++
         if (attempts > 8) {
             stopSelf()
@@ -140,6 +148,7 @@ class CharlotteVoiceForegroundService : Service() {
 
     override fun onDestroy() {
         active = false
+        sessionGeneration++
         handler.removeCallbacks(retry)
         recognizer?.cancel()
         recognizer?.destroy()
