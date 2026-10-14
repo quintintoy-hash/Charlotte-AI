@@ -1,7 +1,7 @@
 package com.charlotte.voice
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import org.junit.Test
+import org.junit.Assert.assertEquals
 
 class CharlotteMicrophoneAccessGateTest {
     @Test fun `start requires permission and explicit user action`() {
