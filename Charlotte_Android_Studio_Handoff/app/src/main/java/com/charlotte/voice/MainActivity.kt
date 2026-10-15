@@ -125,7 +125,15 @@ class MainActivity : Activity() {
                         status.text = "Processing speech..."
                     }
                     override fun onError(error: Int) {
-                        finishListening("Speech recognition failed (code $error). Try again.")
+                        val message = when (error) {
+                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech recognised. Tap Listen and speak clearly."
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard. Try again after the listening prompt."
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Allow microphone access in Settings."
+                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network speech service unavailable. Retry."
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy. Wait and retry."
+                            else -> "Speech recognition error $error. Retry."
+                        }
+                        finishListening(message)
                     }
                     override fun onResults(results: Bundle?) {
                         val phrases = results?.getStringArrayList(
@@ -163,6 +171,8 @@ class MainActivity : Activity() {
 
     private fun finishListening(message: String) {
         listening = false
+        recognizer?.destroy()
+        recognizer = null
         listenButton.text = "Listen"
         status.text = message
     }
