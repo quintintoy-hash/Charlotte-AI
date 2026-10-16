@@ -7,6 +7,9 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
     </queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@style/AppTheme" android:label="Charlotte">
         <activity android:name=".MainActivity" android:exported="true" android:label="Charlotte">
