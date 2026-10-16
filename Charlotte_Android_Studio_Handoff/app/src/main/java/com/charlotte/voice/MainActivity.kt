@@ -12,6 +12,9 @@ import android.widget.Button
 import android.os.Build
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
+import android.media.AudioManager
+import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.TextToSpeech
 import java.util.Locale
 
@@ -28,14 +31,39 @@ class MainActivity : Activity() {
     private var pendingVoiceSession = false
     private var speaker: TextToSpeech? = null
     private var speechReady = false
+    private var ttsInitialized = false
+    private var pendingSpeech: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         speaker = TextToSpeech(this) { result ->
-            speechReady = result == TextToSpeech.SUCCESS
-            if (speechReady) {
-                val result = speaker?.setLanguage(Locale.UK)
-                speechReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+            runOnUiThread {
+                ttsInitialized = true
+                speechReady = result == TextToSpeech.SUCCESS
+                if (speechReady) {
+                    val languageResult = speaker?.setLanguage(Locale.UK)
+                    speechReady = languageResult != TextToSpeech.LANG_MISSING_DATA &&
+                        languageResult != TextToSpeech.LANG_NOT_SUPPORTED
+                    speaker?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            runOnUiThread { status.text = "Charlotte speaking..." }
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            runOnUiThread { status.text = "Charlotte finished speaking." }
+                        }
+                        @Deprecated("Deprecated in Java")
+                        override fun onError(utteranceId: String?) {
+                            runOnUiThread { status.text = "Voice playback error. Check phone media volume and TTS settings." }
+                        }
+                        override fun onError(utteranceId: String?, errorCode: Int) {
+                            runOnUiThread { status.text = "Voice playback error: $errorCode" }
+                        }
+                    })
+                }
+                val queued = pendingSpeech
+                pendingSpeech = null
+                if (queued != null) speakReply(queued)
+                else if (!speechReady) status.text = "Speech engine unavailable. Check installed text-to-speech voices."
             }
         }
         val layout = LinearLayout(this).apply {
@@ -61,8 +89,9 @@ class MainActivity : Activity() {
             }
         }
         layout.addView(status)
+        volumeControlStream = AudioManager.STREAM_MUSIC
         layout.addView(Button(this).apply {
-            text = "Test Charlotte voice"
+            text = "TEST CHARLOTTE VOICE"
             setOnClickListener { speakReply("Hello, Boss. Charlotte voice test successful.") }
         })
         layout.addView(transcript)
@@ -81,7 +110,7 @@ class MainActivity : Activity() {
                 status.text = "Voice session stop requested."
             }
         })
-        setContentView(layout)
+        setContentView(ScrollView(this).apply { addView(layout) })
     }
 
     private fun requestVoiceSession() {
@@ -171,11 +200,7 @@ class MainActivity : Activity() {
                                 else -> "I'm listening, Boss. My full conversational brain isn't connected yet."
                             }
                             status.text = reply
-                            if (speechReady) {
-                                speakReply(reply)
-                            } else {
-                                status.text = "$reply (Speech engine unavailable.)"
-                            }
+                            speakReply(reply)
                         }
                     }
                     override fun onPartialResults(partialResults: Bundle?) {}
@@ -200,8 +225,13 @@ class MainActivity : Activity() {
     }
 
     private fun speakReply(reply: String) {
+        if (!ttsInitialized) {
+            pendingSpeech = reply
+            status.text = "Preparing Charlotte voice..."
+            return
+        }
         if (!speechReady) {
-            status.text = "Charlotte speech engine not ready."
+            status.text = "Charlotte speech engine unavailable. Check phone TTS voice data."
             return
         }
         val result = speaker?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "charlotte-reply")
