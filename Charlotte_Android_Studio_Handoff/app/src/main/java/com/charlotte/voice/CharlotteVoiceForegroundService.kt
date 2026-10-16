@@ -15,6 +15,8 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 
 /**
  * Explicitly started, visible speech-recognition session.
@@ -25,6 +27,8 @@ class CharlotteVoiceForegroundService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
     private var active = false
+    private var speaker: TextToSpeech? = null
+    private var speechReady = false
     private var attempts = 0
     private var sessionGeneration = 0
     private val retry = Runnable { listen() }
@@ -44,6 +48,14 @@ class CharlotteVoiceForegroundService : Service() {
         }
         if (active) return START_NOT_STICKY
         active = true
+        speaker = TextToSpeech(this) { code ->
+            speechReady = code == TextToSpeech.SUCCESS
+            if (speechReady) {
+                val language = speaker?.setLanguage(Locale.UK)
+                speechReady = language != TextToSpeech.LANG_MISSING_DATA &&
+                    language != TextToSpeech.LANG_NOT_SUPPORTED
+            }
+        }
         sessionGeneration++
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "Charlotte voice session", NotificationManager.IMPORTANCE_LOW)
@@ -113,7 +125,17 @@ class CharlotteVoiceForegroundService : Service() {
                         ?.firstOrNull().orEmpty()
                     if (spoken.isNotBlank()) attempts = 0
                     if (WakeWordMatcher.containsWakeWord(spoken)) {
-                        showNotification("Charlotte detected. Listening session active.")
+                        val reply = when {
+                            spoken.contains("hear me", ignoreCase = true) -> "Loud and clear, Boss."
+                            spoken.contains("hello", ignoreCase = true) -> "Hello, Boss. Lovely to hear from you."
+                            else -> "I'm here, Boss."
+                        }
+                        if (speechReady) {
+                            speaker?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "charlotte-session-reply")
+                            showNotification("Charlotte responding: $reply")
+                        } else {
+                            showNotification("Charlotte detected. Speech engine not ready.")
+                        }
                     }
                     scheduleNext()
                 }
@@ -153,6 +175,9 @@ class CharlotteVoiceForegroundService : Service() {
         recognizer?.cancel()
         recognizer?.destroy()
         recognizer = null
+        speaker?.stop()
+        speaker?.shutdown()
+        speaker = null
         super.onDestroy()
     }
 
