@@ -12,6 +12,8 @@ import android.widget.Button
 import android.os.Build
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 
 /**
  * User-initiated speech transcription prototype. Does not listen in the background.
@@ -24,9 +26,15 @@ class MainActivity : Activity() {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var pendingVoiceSession = false
+    private var speaker: TextToSpeech? = null
+    private var speechReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        speaker = TextToSpeech(this) { result ->
+            speechReady = result == TextToSpeech.SUCCESS
+            if (speechReady) speaker?.language = Locale.UK
+        }
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 48, 32, 32)
@@ -147,6 +155,21 @@ class MainActivity : Activity() {
                         } else {
                             "Microphone inactive. Say Charlotte to activate."
                         })
+                        if (wakeDetected) {
+                            val reply = when {
+                                spoken.contains("hear me", ignoreCase = true) ->
+                                    "Loud and clear, Boss. What shall we get up to today?"
+                                spoken.contains("hello", ignoreCase = true) ->
+                                    "Hello, Boss. Lovely to hear from you."
+                                else -> "I'm listening, Boss. My full conversational brain isn't connected yet."
+                            }
+                            status.text = reply
+                            if (speechReady) {
+                                speaker?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "charlotte-reply")
+                            } else {
+                                status.text = "$reply (Speech engine unavailable.)"
+                            }
+                        }
                     }
                     override fun onPartialResults(partialResults: Bundle?) {}
                     override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -206,6 +229,9 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         recognizer?.destroy()
         recognizer = null
+        speaker?.stop()
+        speaker?.shutdown()
+        speaker = null
         super.onDestroy()
     }
 
