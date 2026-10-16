@@ -33,7 +33,10 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         speaker = TextToSpeech(this) { result ->
             speechReady = result == TextToSpeech.SUCCESS
-            if (speechReady) speaker?.language = Locale.UK
+            if (speechReady) {
+                val result = speaker?.setLanguage(Locale.UK)
+                speechReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+            }
         }
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -58,6 +61,10 @@ class MainActivity : Activity() {
             }
         }
         layout.addView(status)
+        layout.addView(Button(this).apply {
+            text = "Test Charlotte voice"
+            setOnClickListener { speakReply("Hello, Boss. Charlotte voice test successful.") }
+        })
         layout.addView(transcript)
         layout.addView(listenButton)
         layout.addView(Button(this).apply {
@@ -165,7 +172,7 @@ class MainActivity : Activity() {
                             }
                             status.text = reply
                             if (speechReady) {
-                                speaker?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "charlotte-reply")
+                                speakReply(reply)
                             } else {
                                 status.text = "$reply (Speech engine unavailable.)"
                             }
@@ -190,6 +197,15 @@ class MainActivity : Activity() {
         } catch (e: Exception) {
             finishListening("Unable to start speech recognition.")
         }
+    }
+
+    private fun speakReply(reply: String) {
+        if (!speechReady) {
+            status.text = "Charlotte speech engine not ready."
+            return
+        }
+        val result = speaker?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "charlotte-reply")
+        status.text = if (result == TextToSpeech.SUCCESS) reply else "Charlotte speech playback failed."
     }
 
     private fun finishListening(message: String) {
