@@ -100,6 +100,20 @@ jobs:
         run: |
           set -o pipefail
           gradle --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee android-build.log
+      - name: Preflight APK signing and package metadata
+        working-directory: Charlotte_Android_Studio_Handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/35.0.0"
+          test -s "$APK"
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/aapt"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee apk-badging.txt
+          grep -q "^package: name='com.charlotte.voice'" apk-badging.txt
+          echo "APK signature and expected package name verified."
       - name: Run Android unit tests
         working-directory: Charlotte_Android_Studio_Handoff
         run: |
@@ -141,6 +155,7 @@ jobs:
           path: |
             Charlotte_Android_Studio_Handoff/android-build.log
             Charlotte_Android_Studio_Handoff/android-tests.log
+            Charlotte_Android_Studio_Handoff/apk-badging.txt
             Charlotte_Android_Studio_Handoff/app/build/test-results/
             Charlotte_Android_Studio_Handoff/app/build/reports/tests/
             Charlotte_Android_Studio_Handoff/app/build/reports/problems/
