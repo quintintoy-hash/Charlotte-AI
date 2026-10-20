@@ -77,6 +77,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Check Android package configuration
+        run: python3 Charlotte_Android_Studio_Handoff/scripts/package_preflight.py
       - name: Verify Android source present
         run: test -f Charlotte_Android_Studio_Handoff/app/build.gradle.kts
       - name: Verify AndroidX configuration
