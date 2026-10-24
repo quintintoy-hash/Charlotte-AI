@@ -31,6 +31,8 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest -q --junitxml=pytest-results.xml 2>&1 | tee pytest-console.log
+      - name: Run Guardian state-machine tests
+        run: PYTHONPATH=guardian python -m unittest discover -s guardian -p 'test_*.py' -v
       - name: Summarize Python results
         if: always()
         shell: bash
